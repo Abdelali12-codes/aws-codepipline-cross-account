@@ -92,7 +92,8 @@
                             {
                               "Action": [
                                 "kms:Decrypt",
-                                "kms:DescribeKey"
+                                "kms:DescribeKey",
+                                "kms:GenerateDataKey"
                               ],
                               "Effect": "Allow",
                               "Resource": "*"
@@ -636,6 +637,13 @@
                         "fromPort": 80,
                         "toPort": 80,
                         "description": "from 0.0.0.0/0:80"
+                      },
+                      {
+                        "cidrIp": "0.0.0.0/0",
+                        "ipProtocol": "tcp",
+                        "fromPort": 8080,
+                        "toPort": 8080,
+                        "description": "from 0.0.0.0/0:8080"
                       }
                     ],
                     "vpcId": {
@@ -1064,6 +1072,29 @@
                         {
                           "Action": [
                             "kms:Decrypt",
+                            "kms:DescribeKey",
+                            "kms:GenerateDataKey"
+                          ],
+                          "Effect": "Allow",
+                          "Principal": {
+                            "AWS": {
+                              "Fn::Join": [
+                                "",
+                                [
+                                  "arn:",
+                                  {
+                                    "Ref": "AWS::Partition"
+                                  },
+                                  ":iam::100275906299:root"
+                                ]
+                              ]
+                            }
+                          },
+                          "Resource": "*"
+                        },
+                        {
+                          "Action": [
+                            "kms:Decrypt",
                             "kms:DescribeKey"
                           ],
                           "Effect": "Allow",
@@ -1122,6 +1153,18 @@
                             }
                           }
                         }
+                      ]
+                    },
+                    "bucketName": {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "pipeline-artifact-bucket-",
+                          {
+                            "Ref": "AWS::AccountId"
+                          },
+                          "-us-east-2"
+                        ]
                       ]
                     },
                     "tags": [
@@ -1446,6 +1489,59 @@
                                       "Arn"
                                     ]
                                   }
+                                },
+                                {
+                                  "Action": [
+                                    "s3:GetObject*",
+                                    "s3:GetBucket*",
+                                    "s3:List*",
+                                    "s3:DeleteObject*",
+                                    "s3:PutObject",
+                                    "s3:PutObjectLegalHold",
+                                    "s3:PutObjectRetention",
+                                    "s3:PutObjectTagging",
+                                    "s3:PutObjectVersionTagging",
+                                    "s3:Abort*"
+                                  ],
+                                  "Effect": "Allow",
+                                  "Resource": [
+                                    {
+                                      "Fn::GetAtt": [
+                                        "PipelineArtifactBucketD127CCF6",
+                                        "Arn"
+                                      ]
+                                    },
+                                    {
+                                      "Fn::Join": [
+                                        "",
+                                        [
+                                          {
+                                            "Fn::GetAtt": [
+                                              "PipelineArtifactBucketD127CCF6",
+                                              "Arn"
+                                            ]
+                                          },
+                                          "/*"
+                                        ]
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "Action": [
+                                    "kms:Decrypt",
+                                    "kms:DescribeKey",
+                                    "kms:Encrypt",
+                                    "kms:ReEncrypt*",
+                                    "kms:GenerateDataKey*"
+                                  ],
+                                  "Effect": "Allow",
+                                  "Resource": {
+                                    "Fn::GetAtt": [
+                                      "ArtifactKey8D84C5F0",
+                                      "Arn"
+                                    ]
+                                  }
                                 }
                               ],
                               "Version": "2012-10-17"
@@ -1633,69 +1729,6 @@
               "version": "2.170.0"
             }
           },
-          "DeployActionRole": {
-            "id": "DeployActionRole",
-            "path": "PipelineStack/DeployActionRole",
-            "children": {
-              "ImportDeployActionRole": {
-                "id": "ImportDeployActionRole",
-                "path": "PipelineStack/DeployActionRole/ImportDeployActionRole",
-                "constructInfo": {
-                  "fqn": "aws-cdk-lib.Resource",
-                  "version": "2.170.0"
-                }
-              },
-              "Resource": {
-                "id": "Resource",
-                "path": "PipelineStack/DeployActionRole/Resource",
-                "attributes": {
-                  "aws:cdk:cloudformation:type": "AWS::IAM::Role",
-                  "aws:cdk:cloudformation:props": {
-                    "assumeRolePolicyDocument": {
-                      "Statement": [
-                        {
-                          "Action": "sts:AssumeRole",
-                          "Effect": "Allow",
-                          "Principal": {
-                            "AWS": {
-                              "Fn::GetAtt": [
-                                "PipelineRoleDCFDBB91",
-                                "Arn"
-                              ]
-                            }
-                          }
-                        }
-                      ],
-                      "Version": "2012-10-17"
-                    },
-                    "policies": [
-                      {
-                        "policyName": "AssumeTargetRole",
-                        "policyDocument": {
-                          "Statement": [
-                            {
-                              "Action": "sts:AssumeRole",
-                              "Effect": "Allow",
-                              "Resource": "arn:aws:iam::100275906299:role/CodePipelineCrossAccountRole"
-                            }
-                          ],
-                          "Version": "2012-10-17"
-                        }
-                      }
-                    ]
-                  }
-                },
-                "constructInfo": {
-                  "fqn": "aws-cdk-lib.aws_iam.CfnRole",
-                  "version": "2.170.0"
-                }
-              }
-            },
-            "constructInfo": {
-              "fqn": "aws-cdk-lib.aws_iam.Role",
-              "version": "2.170.0"
-            }
-          },
           "Pipeline": {
             "id": "Pipeline",
             "path": "PipelineStack/Pipeline",
@@ -1800,12 +1833,7 @@
                           }
                         ],
                         "region": "us-east-2",
-                        "roleArn": {
-                          "Fn::GetAtt": [
-                            "DeployActionRoleB84EDFED",
-                            "Arn"
-                          ]
-                        }
+                        "roleArn": "arn:aws:iam::100275906299:role/CodePipelineCrossAccountRole"
                       }
                     ],
                     "name": "Deploy"
@@ -1815,6 +1843,41 @@
             },
             "constructInfo": {
               "fqn": "aws-cdk-lib.aws_codepipeline.CfnPipeline",
+              "version": "2.170.0"
+            }
+          },
+          "PipelineWebhook": {
+            "id": "PipelineWebhook",
+            "path": "PipelineStack/PipelineWebhook",
+            "attributes": {
+              "aws:cdk:cloudformation:type": "AWS::CodePipeline::Webhook",
+              "aws:cdk:cloudformation:props": {
+                "authentication": "GITHUB_HMAC",
+                "authenticationConfiguration": {
+                  "secretToken": "{{resolve:secretsmanager:github-access-token:SecretString:::}}"
+                },
+                "filters": [
+                  {
+                    "jsonPath": "$.ref",
+                    "matchEquals": "refs/heads/master"
+                  }
+                ],
+                "registerWithThirdParty": false,
+                "targetAction": "GitHub_Source",
+                "targetPipeline": "cross-account-cross-region-pipeline",
+                "targetPipelineVersion": 1
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_codepipeline.CfnWebhook",
+              "version": "2.170.0"
+            }
+          },
+          "WebhookUrl": {
+            "id": "WebhookUrl",
+            "path": "PipelineStack/WebhookUrl",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnOutput",
               "version": "2.170.0"
             }
           },
@@ -1829,6 +1892,14 @@
           "KmsKeyArn": {
             "id": "KmsKeyArn",
             "path": "PipelineStack/KmsKeyArn",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnOutput",
+              "version": "2.170.0"
+            }
+          },
+          "CodeBuildRole": {
+            "id": "CodeBuildRole",
+            "path": "PipelineStack/CodeBuildRole",
             "constructInfo": {
               "fqn": "aws-cdk-lib.CfnOutput",
               "version": "2.170.0"

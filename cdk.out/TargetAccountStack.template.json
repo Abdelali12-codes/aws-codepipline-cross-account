@@ -60,7 +60,8 @@
       {
        "Action": [
         "kms:Decrypt",
-        "kms:DescribeKey"
+        "kms:DescribeKey",
+        "kms:GenerateDataKey"
        ],
        "Effect": "Allow",
        "Resource": "*"
@@ -422,6 +423,13 @@
       "FromPort": 80,
       "IpProtocol": "tcp",
       "ToPort": 80
+     },
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "from 0.0.0.0/0:8080",
+      "FromPort": 8080,
+      "IpProtocol": "tcp",
+      "ToPort": 8080
      }
     ],
     "VpcId": {

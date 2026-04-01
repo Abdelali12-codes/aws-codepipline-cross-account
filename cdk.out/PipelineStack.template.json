@@ -27,6 +27,29 @@
       {
        "Action": [
         "kms:Decrypt",
+        "kms:DescribeKey",
+        "kms:GenerateDataKey"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "AWS": {
+         "Fn::Join": [
+          "",
+          [
+           "arn:",
+           {
+            "Ref": "AWS::Partition"
+           },
+           ":iam::100275906299:root"
+          ]
+         ]
+        }
+       },
+       "Resource": "*"
+      },
+      {
+       "Action": [
+        "kms:Decrypt",
         "kms:DescribeKey"
        ],
        "Effect": "Allow",
@@ -72,6 +95,18 @@
         "SSEAlgorithm": "aws:kms"
        }
       }
+     ]
+    },
+    "BucketName": {
+     "Fn::Join": [
+      "",
+      [
+       "pipeline-artifact-bucket-",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       "-us-east-2"
+      ]
      ]
     },
     "Tags": [
@@ -381,6 +416,59 @@
          "Arn"
         ]
        }
+      },
+      {
+       "Action": [
+        "s3:GetObject*",
+        "s3:GetBucket*",
+        "s3:List*",
+        "s3:DeleteObject*",
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging",
+        "s3:Abort*"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "PipelineArtifactBucketD127CCF6",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "PipelineArtifactBucketD127CCF6",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "kms:Decrypt",
+        "kms:DescribeKey",
+        "kms:Encrypt",
+        "kms:ReEncrypt*",
+        "kms:GenerateDataKey*"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "ArtifactKey8D84C5F0",
+         "Arn"
+        ]
+       }
       }
      ],
      "Version": "2012-10-17"
@@ -520,46 +608,6 @@
     "aws:cdk:path": "PipelineStack/PipelineRole/Resource"
    }
   },
-  "DeployActionRoleB84EDFED": {
-   "Type": "AWS::IAM::Role",
-   "Properties": {
-    "AssumeRolePolicyDocument": {
-     "Statement": [
-      {
-       "Action": "sts:AssumeRole",
-       "Effect": "Allow",
-       "Principal": {
-        "AWS": {
-         "Fn::GetAtt": [
-          "PipelineRoleDCFDBB91",
-          "Arn"
-         ]
-        }
-       }
-      }
-     ],
-     "Version": "2012-10-17"
-    },
-    "Policies": [
-     {
-      "PolicyDocument": {
-       "Statement": [
-        {
-         "Action": "sts:AssumeRole",
-         "Effect": "Allow",
-         "Resource": "arn:aws:iam::100275906299:role/CodePipelineCrossAccountRole"
-        }
-       ],
-       "Version": "2012-10-17"
-      },
-      "PolicyName": "AssumeTargetRole"
-     }
-    ]
-   },
-   "Metadata": {
-    "aws:cdk:path": "PipelineStack/DeployActionRole/Resource"
-   }
-  },
   "Pipeline": {
    "Type": "AWS::CodePipeline::Pipeline",
    "Properties": {
@@ -661,12 +709,7 @@
         ],
         "Name": "CrossAccountDeploy",
         "Region": "us-east-2",
-        "RoleArn": {
-         "Fn::GetAtt": [
-          "DeployActionRoleB84EDFED",
-          "Arn"
-         ]
-        }
+        "RoleArn": "arn:aws:iam::100275906299:role/CodePipelineCrossAccountRole"
        }
       ],
       "Name": "Deploy"
@@ -677,10 +720,32 @@
     "aws:cdk:path": "PipelineStack/Pipeline"
    }
   },
+  "PipelineWebhook": {
+   "Type": "AWS::CodePipeline::Webhook",
+   "Properties": {
+    "Authentication": "GITHUB_HMAC",
+    "AuthenticationConfiguration": {
+     "SecretToken": "{{resolve:secretsmanager:github-access-token:SecretString:::}}"
+    },
+    "Filters": [
+     {
+      "JsonPath": "$.ref",
+      "MatchEquals": "refs/heads/master"
+     }
+    ],
+    "RegisterWithThirdParty": false,
+    "TargetAction": "GitHub_Source",
+    "TargetPipeline": "cross-account-cross-region-pipeline",
+    "TargetPipelineVersion": 1
+   },
+   "Metadata": {
+    "aws:cdk:path": "PipelineStack/PipelineWebhook"
+   }
+  },
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/1WMQW7CMBBFz8J+MiVlgbosLFlghQMg40zpEMeOPHZRZPnuVUhU6Oo/v5HfO9bbNa5X+i6VabvK8gXzKWrTgb7LOXe9YD7QCPsvd6CxgGww75LpKE5qoXmUt2zGp57fBYxv6ZLYtpgVD2TZkQr+RuaRWLAA6x5z4y1N9rHP4GtqWBo4+YUL7JNE3zckPgUzJ/7430kF/8MthZ0Wgk8Riqeor+yu8Pr5mOKQYgE1xm/v3jZY1/ixuglzFZKL3BM28/4CL0K9jkIBAAA="
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/1WMPW/CMBCGfwu7cyVlqDoWRgasMHREjnOFw44d+WxQZPm/VyFRodP7dfe8Q/2xhvVK3bnSnakstZCPUWkj1J1P2fQMeY+j2P24PY5F8AbyNmmDcaoWN4v0lvT4rOdchPYdtolsB1nSgJYcyuCvqB+IxRZBqofceItT+9An8BU1LAzI07CE6egb24v3phSxSxx93yD7FPTM+/P/Jhn8jToMW8UovpgxHqM6kzuL1+dDikOKRcgxXrx720Bdw+fqykRVSC5Sj9DM+gu2i4NWTwEAAA=="
    },
    "Metadata": {
     "aws:cdk:path": "PipelineStack/CDKMetadata/Default"
@@ -688,6 +753,14 @@
   }
  },
  "Outputs": {
+  "WebhookUrl": {
+   "Value": {
+    "Fn::GetAtt": [
+     "PipelineWebhook",
+     "Url"
+    ]
+   }
+  },
   "ArtifactBucket": {
    "Value": {
     "Ref": "PipelineArtifactBucketD127CCF6"
@@ -697,6 +770,14 @@
    "Value": {
     "Fn::GetAtt": [
      "ArtifactKey8D84C5F0",
+     "Arn"
+    ]
+   }
+  },
+  "CodeBuildRole": {
+   "Value": {
+    "Fn::GetAtt": [
+     "BuildProjectRoleAA92C755",
      "Arn"
     ]
    }

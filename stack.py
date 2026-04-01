@@ -43,8 +43,7 @@ class TargetAccountStack(cdk.Stack):
             )
         )
 
-        # Allow reading artifacts from the pipeline's cross-region S3 bucket
-        # (the pipeline will grant explicit bucket access separately)
+        # Allow reading artifacts from the pipeline's artifact bucket in source account
         self.cross_account_role.add_to_policy(
             iam.PolicyStatement(
                 actions=["s3:GetObject*", "s3:GetBucket*", "s3:List*"],
@@ -55,7 +54,7 @@ class TargetAccountStack(cdk.Stack):
         # Allow decrypting artifacts encrypted with the pipeline's KMS key
         self.cross_account_role.add_to_policy(
             iam.PolicyStatement(
-                actions=["kms:Decrypt", "kms:DescribeKey"],
+                actions=["kms:Decrypt", "kms:DescribeKey", "kms:GenerateDataKey"],
                 resources=["*"],
             )
         )
@@ -67,6 +66,7 @@ class TargetAccountStack(cdk.Stack):
         sg = ec2.SecurityGroup(self, "InstanceSG", vpc=vpc)
         sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(22))
         sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(80))
+        sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(8080))
 
         # ── IAM role for EC2 (CodeDeploy agent needs S3 + SSM) ────────
         ec2_role = iam.Role(
@@ -160,7 +160,7 @@ class PipelineStack(cdk.Stack):
         key.add_to_resource_policy(
             iam.PolicyStatement(
                 principals=[iam.AccountPrincipal(target_account_id)],
-                actions=["kms:Decrypt", "kms:DescribeKey"],
+                actions=["kms:Decrypt", "kms:DescribeKey", "kms:GenerateDataKey"],
                 resources=["*"],
             )
         )
@@ -168,6 +168,7 @@ class PipelineStack(cdk.Stack):
         # ── Artifact bucket (tools account, tools region) ─────────────────
         artifact_bucket = s3.Bucket(
             self, "PipelineArtifactBucket",
+            bucket_name=f"pipeline-artifact-bucket-{cdk.Aws.ACCOUNT_ID}-{self.region}",
             encryption_key=key,
             removal_policy=cdk.RemovalPolicy.DESTROY,
             auto_delete_objects=True,
@@ -189,6 +190,8 @@ class PipelineStack(cdk.Stack):
                 },
             }),
         )
+
+        artifact_bucket.grant_read_write(build_project.role)
 
         # ── Pipeline role ─────────────────────────────────────────────────
         pipeline_role = iam.Role(
@@ -231,25 +234,10 @@ class PipelineStack(cdk.Stack):
         # Assumed by the pipeline role to call CodeDeploy in the target account.
         cross_account_role_arn = f"arn:aws:iam::{target_account_id}:role/CodePipelineCrossAccountRole"
 
-        deploy_action_role = iam.Role(
-            self, "DeployActionRole",
-            assumed_by=iam.ArnPrincipal(pipeline_role.role_arn),
-            inline_policies={
-                "AssumeTargetRole": iam.PolicyDocument(
-                    statements=[
-                        iam.PolicyStatement(
-                            actions=["sts:AssumeRole"],
-                            resources=[cross_account_role_arn],
-                        ),
-                    ]
-                )
-            },
-        )
-
         # ── Pipeline (L1 CfnPipeline) ─────────────────────────────────────
         # Using CfnPipeline so we can set `region` and `role_arn` per action,
         # enabling both cross-account and cross-region deployments.
-        codepipeline.CfnPipeline(
+        cfn_pipeline = codepipeline.CfnPipeline(
             self, "Pipeline",
             name="cross-account-cross-region-pipeline",
             role_arn=pipeline_role.role_arn,
@@ -338,7 +326,7 @@ class PipelineStack(cdk.Stack):
                         codepipeline.CfnPipeline.ActionDeclarationProperty(
                             name="CrossAccountDeploy",
                             region=target_region,
-                            role_arn=deploy_action_role.role_arn,
+                            role_arn=cross_account_role_arn,
                             action_type_id=codepipeline.CfnPipeline.ActionTypeIdProperty(
                                 category="Deploy",
                                 owner="AWS",
@@ -356,5 +344,25 @@ class PipelineStack(cdk.Stack):
             ],
         )
 
+        webhook = codepipeline.CfnWebhook(
+            self, "PipelineWebhook",
+            authentication="GITHUB_HMAC",
+            target_pipeline=cfn_pipeline.name,
+            target_pipeline_version=1,
+            target_action="GitHub_Source",
+            filters=[
+                codepipeline.CfnWebhook.WebhookFilterRuleProperty(
+                    json_path="$.ref",
+                    match_equals="refs/heads/master",
+                ),
+            ],
+            authentication_configuration=codepipeline.CfnWebhook.WebhookAuthConfigurationProperty(
+                secret_token=cdk.SecretValue.secrets_manager("github-access-token").unsafe_unwrap(),
+            ),
+            register_with_third_party=False,
+        )
+
+        cdk.CfnOutput(self, "WebhookUrl", value=webhook.attr_url)
         cdk.CfnOutput(self, "ArtifactBucket", value=artifact_bucket.bucket_name)
         cdk.CfnOutput(self, "KmsKeyArn", value=key.key_arn)
+        cdk.CfnOutput(self, "CodeBuildRole", value=build_project.role.role_arn)

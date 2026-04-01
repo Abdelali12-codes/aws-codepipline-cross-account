@@ -18,7 +18,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::100275906299:role/cdk-hnb659fds-deploy-role-100275906299-us-east-2",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::100275906299:role/cdk-hnb659fds-cfn-exec-role-100275906299-us-east-2",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-100275906299-us-east-2/1aaba6de221d11f4a4077ea60c090cd9d243acae6a09801c748d09fec2f49f38.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-100275906299-us-east-2/938a087b611df6f6a9b4809b9bb04a770897a2f54708edb135204e59f2d148c9.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -246,7 +246,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::080266302756:role/cdk-hnb659fds-deploy-role-080266302756-us-east-2",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::080266302756:role/cdk-hnb659fds-cfn-exec-role-080266302756-us-east-2",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-080266302756-us-east-2/c14c92dd0928f6bd2b7eae22f8c9bde8d0af4d835f576dceaa0ef4fe78dbdc43.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-080266302756-us-east-2/911a8421d1207816d20b502c75d793885e2caa46889456f89a86c2a1d5d55b31.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -328,16 +328,22 @@
             "data": "PipelineRoleDCFDBB91"
           }
         ],
-        "/PipelineStack/DeployActionRole/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "DeployActionRoleB84EDFED"
-          }
-        ],
         "/PipelineStack/Pipeline": [
           {
             "type": "aws:cdk:logicalId",
             "data": "Pipeline"
+          }
+        ],
+        "/PipelineStack/PipelineWebhook": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "PipelineWebhook"
+          }
+        ],
+        "/PipelineStack/WebhookUrl": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "WebhookUrl"
           }
         ],
         "/PipelineStack/ArtifactBucket": [
@@ -350,6 +356,12 @@
           {
             "type": "aws:cdk:logicalId",
             "data": "KmsKeyArn"
+          }
+        ],
+        "/PipelineStack/CodeBuildRole": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CodeBuildRole"
           }
         ],
         "/PipelineStack/CDKMetadata/Default": [
