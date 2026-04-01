@@ -16,7 +16,8 @@ from constructs import Construct
 # to perform deployments, plus the CodeDeploy resources being deployed to.
 class TargetAccountStack(cdk.Stack):
     def __init__(self, scope: Construct, id: str,
-                 tools_account_id: str, **kwargs):
+                 tools_account_id: str,
+                 **kwargs):
         super().__init__(scope, id, **kwargs)
 
         # Role assumed by CodePipeline (running in tools account) to deploy here.
@@ -73,8 +74,25 @@ class TargetAccountStack(cdk.Stack):
             assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
             managed_policies=[
                 iam.ManagedPolicy.from_aws_managed_policy_name("AmazonSSMManagedInstanceCore"),
-                iam.ManagedPolicy.from_aws_managed_policy_name("AmazonS3ReadOnlyAccess"),
             ],
+            inline_policies={
+                "ArtifactBucketAccess": iam.PolicyDocument(
+                    statements=[
+                        # Access to the pipeline artifact bucket in AccountA
+                        iam.PolicyStatement(
+                            actions=["s3:GetObject", "s3:GetObjectVersion", "s3:ListBucket"],
+                            resources=[
+                                "*"
+                            ],
+                        ),
+                        # Access to the KMS key used to encrypt artifacts in AccountA
+                        iam.PolicyStatement(
+                            actions=["kms:Decrypt", "kms:DescribeKey"],
+                            resources=["*"],
+                        ),
+                    ]
+                )
+            },
         )
 
         # ── User data — install CodeDeploy agent on Ubuntu ────────────
@@ -150,7 +168,6 @@ class PipelineStack(cdk.Stack):
         # ── Artifact bucket (tools account, tools region) ─────────────────
         artifact_bucket = s3.Bucket(
             self, "PipelineArtifactBucket",
-            bucket_name=f"codepipeline-artifacts-{self.account}",
             encryption_key=key,
             removal_policy=cdk.RemovalPolicy.DESTROY,
             auto_delete_objects=True,
@@ -236,6 +253,30 @@ class PipelineStack(cdk.Stack):
             self, "Pipeline",
             name="cross-account-cross-region-pipeline",
             role_arn=pipeline_role.role_arn,
+            # artifact_stores=[
+            #     codepipeline.CfnPipeline.ArtifactStoreMapProperty(
+            #         region=self.region,
+            #         artifact_store=codepipeline.CfnPipeline.ArtifactStoreProperty(
+            #             type="S3",
+            #             location=artifact_bucket.bucket_name,
+            #             encryption_key=codepipeline.CfnPipeline.EncryptionKeyProperty(
+            #                 type="KMS",
+            #                 id=key.key_arn,
+            #             ),
+            #         ),
+            #     ),
+            #     codepipeline.CfnPipeline.ArtifactStoreMapProperty(
+            #         region=target_region,
+            #         artifact_store=codepipeline.CfnPipeline.ArtifactStoreProperty(
+            #             type="S3",
+            #             location=artifact_bucket.bucket_name,
+            #             encryption_key=codepipeline.CfnPipeline.EncryptionKeyProperty(
+            #                 type="KMS",
+            #                 id=key.key_arn,
+            #             ),
+            #         ),
+            #     ),
+            # ],
             artifact_store=codepipeline.CfnPipeline.ArtifactStoreProperty(
                 type="S3",
                 location=artifact_bucket.bucket_name,

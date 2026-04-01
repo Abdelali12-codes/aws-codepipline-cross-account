@@ -696,18 +696,33 @@
                             ":iam::aws:policy/AmazonSSMManagedInstanceCore"
                           ]
                         ]
-                      },
+                      }
+                    ],
+                    "policies": [
                       {
-                        "Fn::Join": [
-                          "",
-                          [
-                            "arn:",
+                        "policyName": "ArtifactBucketAccess",
+                        "policyDocument": {
+                          "Statement": [
                             {
-                              "Ref": "AWS::Partition"
+                              "Action": [
+                                "s3:GetObject",
+                                "s3:GetObjectVersion",
+                                "s3:ListBucket"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "*"
                             },
-                            ":iam::aws:policy/AmazonS3ReadOnlyAccess"
-                          ]
-                        ]
+                            {
+                              "Action": [
+                                "kms:Decrypt",
+                                "kms:DescribeKey"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "*"
+                            }
+                          ],
+                          "Version": "2012-10-17"
+                        }
                       }
                     ]
                   }
@@ -1109,7 +1124,6 @@
                         }
                       ]
                     },
-                    "bucketName": "codepipeline-artifacts-080266302756",
                     "tags": [
                       {
                         "key": "aws-cdk:auto-delete-objects",
@@ -1367,7 +1381,7 @@
                                           {
                                             "Ref": "AWS::Partition"
                                           },
-                                          ":logs:us-east-1:080266302756:log-group:/aws/codebuild/",
+                                          ":logs:us-east-2:080266302756:log-group:/aws/codebuild/",
                                           {
                                             "Ref": "BuildProject097C5DB7"
                                           }
@@ -1382,7 +1396,7 @@
                                           {
                                             "Ref": "AWS::Partition"
                                           },
-                                          ":logs:us-east-1:080266302756:log-group:/aws/codebuild/",
+                                          ":logs:us-east-2:080266302756:log-group:/aws/codebuild/",
                                           {
                                             "Ref": "BuildProject097C5DB7"
                                           },
@@ -1409,7 +1423,7 @@
                                         {
                                           "Ref": "AWS::Partition"
                                         },
-                                        ":codebuild:us-east-1:080266302756:report-group/",
+                                        ":codebuild:us-east-2:080266302756:report-group/",
                                         {
                                           "Ref": "BuildProject097C5DB7"
                                         },

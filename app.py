@@ -4,16 +4,14 @@ from stack import PipelineStack, TargetAccountStack
 
 # ── Account / region configuration ──────────────────────────────────────────
 # Replace these with your actual account IDs and regions.
-TOOLS_ACCOUNT  = "080266302756"   # account where the pipeline lives
-TOOLS_REGION   = "us-east-1"
+TOOLS_ACCOUNT  = "080266302756"
+TOOLS_REGION   = "us-east-2"
 
-TARGET_ACCOUNT = "100275906299"   # account being deployed to
-TARGET_REGION  = "us-east-2"      # can differ from TOOLS_REGION (cross-region)
+TARGET_ACCOUNT = "100275906299"
+TARGET_REGION  = "us-east-2"
 
 app = cdk.App()
 
-# ── Step 1: deploy TargetAccountStack into the TARGET account first ──────────
-# This creates the cross-account IAM role and CodeDeploy resources.
 target_stack = TargetAccountStack(
     app, "TargetAccountStack",
     tools_account_id=TOOLS_ACCOUNT,
