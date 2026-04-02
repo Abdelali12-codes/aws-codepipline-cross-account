@@ -3,28 +3,65 @@
 ## Architecture
 
 ```
-TOOLS ACCOUNT (us-east-2)          TARGET ACCOUNT (us-east-2)
+TOOLS ACCOUNT (us-east-1)          TARGET ACCOUNT (us-east-2)
 ┌──────────────────────────┐        ┌──────────────────────────┐
 │  CodePipeline            │        │  CodeDeploy              │
 │  ├─ Source (GitHub)      │        │  ├─ Application          │
 │  ├─ Build  (CodeBuild)   │──────▶ │  └─ Deployment Group     │
 │  └─ Deploy               │ assume │                          │
 │                          │  role  │  IAM CrossAccountRole    │
-│  KMS Key                 │        │  EC2 Ubuntu Instance     │
+│  KMS Key                 │        │  (trusted by tools acct) │
 │  Artifact S3 Bucket      │        └──────────────────────────┘
+│  Replication S3 Bucket   │
+│  (us-east-2)             │
 └──────────────────────────┘
 ```
+
+## CDK Bootstrap — Cross-Account Trust
+
+Before deploying, both accounts must be CDK-bootstrapped.
+The TARGET account bootstrap must explicitly trust the TOOLS account
+so CDK can deploy resources into it from the tools account.
+
+```bash
+# 1. Bootstrap TOOLS account (us-east-1)
+cdk bootstrap \
+  --profile tools-profile \
+  aws://111111111111/us-east-1
+
+# 2. Bootstrap TARGET account (us-east-2)
+#    --trust         → allows the TOOLS account to deploy into this account
+#    --trust-for-lookup → allows CDK context lookups from the TOOLS account
+#    --cloudformation-execution-policies → permissions CDK gets when deploying
+cdk bootstrap \
+  --profile target-profile \
+  --trust 111111111111 \
+  --trust-for-lookup 111111111111 \
+  --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess \
+  aws://222222222222/us-east-2
+```
+
+Replace `111111111111` with your tools account ID and `222222222222` with your target account ID.
 
 ## Deploy Order
 
 ```bash
-# 1. Deploy PipelineStack first to get bucket name and KMS key ARN outputs
-cdk deploy PipelineStack --profile tools-profile
-
-# 2. Fill in TOOLS_KMS_KEY_ARN and TOOLS_ARTIFACT_BUCKET in app.py from outputs
-
-# 3. Deploy TargetAccountStack
+# 1. Deploy TargetAccountStack first (creates the CrossAccountRole + CodeDeploy resources)
 cdk deploy TargetAccountStack --profile target-profile
+
+# 2. Deploy PipelineStack (creates the pipeline in the tools account)
+cdk deploy PipelineStack --profile tools-profile
+```
+
+## Configuration
+
+Edit `app.py` to set your real account IDs:
+
+```python
+TOOLS_ACCOUNT  = "111111111111"
+TOOLS_REGION   = "us-east-1"
+TARGET_ACCOUNT = "222222222222"
+TARGET_REGION  = "us-east-2"
 ```
 
 ---
